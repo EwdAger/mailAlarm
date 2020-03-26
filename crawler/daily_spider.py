@@ -7,19 +7,19 @@ Created on 2020/3/24 16:39
 from datetime import datetime
 
 import requests
-from fake_useragent import UserAgent
+# from fake_useragent import UserAgent
 from bs4 import BeautifulSoup
 
 from crawler.settings import login_dict, parse_dict
 
-ua = UserAgent()
+# ua = UserAgent()
 
 
 class DailySpider:
 
     def __init__(self):
         self.session = requests.session()
-        self.session.headers.update({"user-agent": ua.random})
+        # self.session.headers.update({"user-agent": ua.random})
         self.is_login = False
 
     def login(self):
@@ -31,20 +31,35 @@ class DailySpider:
         })
         self.is_login = True
 
-    def do_crawl(self):
+    def do_crawl(self, only_check_update=False):
         if not self.is_login:
             self.login()
 
         daily_dict = {}
         for page_id, name in parse_dict['team_dict'].items():
             res = self.session.get(f"{parse_dict['daily_url']}?pageId={page_id}")
-            daily_dict[name] = self._parse(res)
+            soup = BeautifulSoup(res.text, 'html.parser')
+            if only_check_update:
+                daily_dict[name] = self.check_update(soup)
+            else:
+                daily_dict[name] = self._parse(soup)
 
         return daily_dict
 
-    def _parse(self, res):
+    def check_update(self, soup):
+
+        # 获取最后一条日报记录
+        last_comment = soup.findAll("li", attrs={"class": "comment-thread"})[-1]
+        # 获取编写时间
+        update_time = last_comment.find('li', attrs={"class": "comment-date"})('a')[0].attrs['title']
+        update_time = self._format_time(update_time)
+        is_update = True
+        if update_time.date() < datetime.now().date():
+            is_update = False
+        return is_update
+
+    def _parse(self, soup):
         daily = ''
-        soup = BeautifulSoup(res.text, 'html.parser')
 
         # 获取最后一条日报记录
         last_comment = soup.findAll("li", attrs={"class": "comment-thread"})[-1]
@@ -78,4 +93,5 @@ if __name__ == "__main__":
     a = DailySpider()
     daily = a.do_crawl()
     from mail_pigeon.pigeon import send_daily
+
     send_daily(daily)
