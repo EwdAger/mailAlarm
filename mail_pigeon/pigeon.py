@@ -31,7 +31,7 @@ class Pigeon:
         self.scheduler.add_job(self.check_update, trigger='cron', args=[4], hour=18, minute=30)
 
         self.scheduler.add_job(self.send_daily, trigger='cron', hour=19, minute=00)
-        print("添加任务成功")
+        print(f"添加任务成功! -- {datetime.now().strftime('%Y-%m-%d %H:%M')} --")
 
     def check_update(self, time):
         user_dict = self.spider.do_crawl(only_check_update=True)
@@ -42,7 +42,7 @@ class Pigeon:
 
     @staticmethod
     def tell_alive():
-        print(f"I'm alive!!! Time is: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+        print(f"I'm alive!!! Time is: -- {datetime.now().strftime('%Y-%m-%d %H:%M')} --")
 
     @staticmethod
     def _send_alert(time, user):
