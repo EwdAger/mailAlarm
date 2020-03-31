@@ -26,12 +26,16 @@ class Pigeon:
         self.scheduler.add_job(self.tell_alive, trigger='cron', minute="*/5")
 
         self.scheduler.add_job(self.check_update, trigger='cron', args=[0], day_of_week='mon-fri', hour=17, minute=30)
-        self.scheduler.add_job(self.check_update, trigger='cron', args=[1], day_of_week='mon-fri', hour=17, minute=45)
-        self.scheduler.add_job(self.check_update, trigger='cron', args=[2], day_of_week='mon-fri', hour=18, minute=00)
-        self.scheduler.add_job(self.check_update, trigger='cron', args=[3], day_of_week='mon-fri', hour=18, minute=15)
-        self.scheduler.add_job(self.check_update, trigger='cron', args=[4], day_of_week='mon-fri', hour=18, minute=30)
+        self.scheduler.add_job(self.check_update, trigger='cron', args=[1], day_of_week='mon-fri', hour=18, minute=00)
+        self.scheduler.add_job(self.check_update, trigger='cron', args=[2], day_of_week='mon-fri', hour=18, minute=30)
+        self.scheduler.add_job(self.check_update, trigger='cron', args=[3], day_of_week='mon-fri', hour=19, minute=00)
+        self.scheduler.add_job(self.check_update, trigger='cron', args=[4], day_of_week='mon-fri', hour=19, minute=30)
+        self.scheduler.add_job(self.check_update, trigger='cron', args=[5], day_of_week='mon-fri', hour=20, minute=00)
+        self.scheduler.add_job(self.check_update, trigger='cron', args=[6], day_of_week='mon-fri', hour=20, minute=30)
+        self.scheduler.add_job(self.check_update, trigger='cron', args=[7], day_of_week='mon-fri', hour=20, minute=50)
 
-        self.scheduler.add_job(self.send_daily, trigger='cron', hour=19, minute=00)
+        self.scheduler.add_job(self.send_daily, trigger='cron', args=[True], day_of_week='mon-thu', hour=21, minute=00)
+        self.scheduler.add_job(self.send_daily, trigger='cron', args=[False], day_of_week='fri', hour=21, minute=00)
         print(f"添加任务成功! -- {datetime.now().strftime('%Y-%m-%d %H:%M')} --")
 
     def check_update(self, time):
@@ -53,14 +57,17 @@ class Pigeon:
             1: "又",
             2: "双",
             3: "叒",
-            4: "叕"
+            4: "叕",
+            5: "又双叒叕",
+            6: "槑",
+            7: "叕燚朤茻田"
         }
 
         mail_msg = '你今天'
         ceil = (time*100) + 1
         for i in range(ceil):
             mail_msg += word_dict[time]
-        mail_msg += "没有写日报哦~ \n\n若一直没写日报，本条信息将从17:30至19:00每间隔15min，提醒一次~\n\n若至19:00还未写日报，将留空您今天的日报"
+        mail_msg += "没有写日报哦~ \n\n若一直没写日报，本条信息将从17:30至21:00每间隔30min，提醒一次~\n\n若至21:00还未写日报，将留空您今天的日报"
 
         ret = True
         try:
@@ -89,15 +96,15 @@ class Pigeon:
         html = format_html(date_now, str_members, body)
         return html
 
-    def send_daily(self):
+    def send_daily(self, is_daily=True):
         daily_dict = self.spider.do_crawl()
 
-        all_none = True
+        all_none_count = 0
         for daily in daily_dict.values():
-            if daily:
-                all_none = False
-        if all_none:
-            print("今天大家都没有写日报，应该是节假日")
+            if not daily:
+                all_none_count += 1
+        if all_none_count >= len(getter['user'].values()) * 0.4:
+            print("今天大家大部分都没有写日/周报，应该是节假日")
             return False
 
         mail_msg = self.parse(daily_dict)
@@ -108,13 +115,20 @@ class Pigeon:
 
             msg = MIMEText(mail_msg, 'html', 'utf-8')
             msg['From'] = formataddr(("宁文杰", sender['email']))
-            msg['To'] = ', '.join(email_list)
-            msg['Cc'] = ', '.join(getter['copy'])
-            msg['Subject'] = "数据智能组日报{}".format(datetime.now().strftime("%Y/%m/%d"))
+            if is_daily:
+                msg['To'] = ', '.join(email_list)
+                msg['Cc'] = ', '.join(getter['copy'])
+                msg['Subject'] = "数据智能组日报{}".format(datetime.now().strftime("%Y/%m/%d"))
+            else:
+                msg['To'] = formataddr(("吴占伟", getter['user']['吴占伟'], ))
+                msg['Subject'] = "数据智能组周报{}".format(datetime.now().strftime("%Y/%m/%d"))
 
             server = smtplib.SMTP_SSL("smtp.exmail.qq.com", 465)
             server.login(sender['email'], sender['password'])
-            server.sendmail(sender['email'], email_list+getter['copy'], msg.as_string())
+            if is_daily:
+                server.sendmail(sender['email'], email_list+getter['copy'], msg.as_string())
+            else:
+                server.sendmail(sender['email'], [getter['user']['吴占伟']], msg.as_string())
             server.quit()
             print(f'{datetime.now().strftime("%Y/%m/%d")} 日报发送成功！')
         except Exception as e:
